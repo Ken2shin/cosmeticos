@@ -28,11 +28,31 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   try {
     const id = Number.parseInt(params.id)
 
-    await sql`DELETE FROM products WHERE id = ${id}`
+    const existingProduct = await sql`SELECT id FROM products WHERE id = ${id}`
 
-    return NextResponse.json({ success: true })
+    if (existingProduct.length === 0) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 })
+    }
+
+    await sql`DELETE FROM order_items WHERE product_id = ${id}`
+
+    const result = await sql`DELETE FROM products WHERE id = ${id} RETURNING id`
+
+    if (result.length === 0) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, message: "Product deleted successfully" })
   } catch (error) {
     console.error("Error deleting product:", error)
+    if (error instanceof Error && error.message.includes("foreign key")) {
+      return NextResponse.json(
+        {
+          error: "Cannot delete product because it is referenced in orders",
+        },
+        { status: 400 },
+      )
+    }
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 })
   }
 }

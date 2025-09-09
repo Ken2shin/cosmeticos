@@ -13,6 +13,7 @@ export function ProductManagement() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false) // Add loading state during deletion
 
   useEffect(() => {
     fetchProducts()
@@ -44,18 +45,24 @@ export function ProductManagement() {
 
   const handleDelete = async (productId: number) => {
     if (confirm("¿Estás seguro de que quieres eliminar este producto?")) {
+      setDeleteLoading(true) // Add loading state during deletion
       try {
         const response = await fetch(`/api/products/${productId}`, { method: "DELETE" })
 
+        const data = await response.json()
+
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
+          throw new Error(data.error || `HTTP error! status: ${response.status}`)
         }
 
         alert("Producto eliminado exitosamente")
-        fetchProducts()
+        await fetchProducts()
       } catch (error) {
         console.error("[v0] Error deleting product:", error)
-        alert("Error al eliminar el producto")
+        const errorMessage = error instanceof Error ? error.message : "Error desconocido al eliminar el producto"
+        alert(`Error al eliminar el producto: ${errorMessage}`)
+      } finally {
+        setDeleteLoading(false) // Add loading state during deletion
       }
     }
   }
@@ -111,7 +118,7 @@ export function ProductManagement() {
         </Button>
       </div>
 
-      {loading ? (
+      {loading || deleteLoading ? ( // Add loading state during deletion
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -182,6 +189,7 @@ export function ProductManagement() {
                     size="sm"
                     onClick={() => handleDelete(product.id)}
                     className="text-destructive hover:text-destructive hover:bg-red-50 hover:border-red-300 transition-colors"
+                    disabled={deleteLoading} // Disable button during deletion
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
