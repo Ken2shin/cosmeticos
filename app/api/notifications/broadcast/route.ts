@@ -1,16 +1,14 @@
-import { NextResponse } from "next/server";
-import { neon } from "@neondatabase/serverless";
-
-const sql = neon(process.env.DATABASE_URL!);
+import { NextResponse } from "next/server"
+import { sql } from "@/lib/db"
 
 export async function POST(request: Request) {
   try {
-    const { type, title, message, data } = await request.json();
+    const { type, title, message, data } = await request.json()
 
     try {
-      await sql`SELECT 1 FROM push_subscriptions LIMIT 1`;
+      await sql`SELECT 1 FROM push_subscriptions LIMIT 1`
     } catch (tableError) {
-      console.log("[v0] Push subscriptions table doesn't exist, creating it...");
+      console.log("[v0] Push subscriptions table doesn't exist, creating it...")
       await sql`
         CREATE TABLE IF NOT EXISTS push_subscriptions (
           id SERIAL PRIMARY KEY,
@@ -20,15 +18,16 @@ export async function POST(request: Request) {
           auth TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-      `;
+      `
     }
 
+    // Obtener suscripciones de administradores para notificaciones de pedidos
     const subscriptions = await sql`
       SELECT * FROM push_subscriptions
       WHERE user_type = 'admin'
-    `;
+    `
 
-    const pushPromises = subscriptions.map(async (subscription: any) => {
+    const pushPromises = subscriptions.map(async (subscription) => {
       try {
         const payload = JSON.stringify({
           title: title || "Nueva Lista de Pedido",
@@ -42,7 +41,7 @@ export async function POST(request: Request) {
           icon: "/favicon.ico",
           badge: "/favicon.ico",
           tag: `order-${data?.orderId || Date.now()}`,
-          requireInteraction: true,
+          requireInteraction: true, // Requiere interacción para listas de pedidos importantes
           actions: [
             {
               action: "view",
@@ -53,16 +52,15 @@ export async function POST(request: Request) {
               title: "Cerrar",
             },
           ],
-        });
+        })
 
         console.log(`[v0] Enviando notificación de lista de pedido:`, {
           customer: data?.customerName,
           phone: data?.customerPhone,
           total: data?.total,
           items: data?.items?.length,
-        });
+        })
 
-        // Este bloque solo se ejecuta en el cliente, no en el servidor
         if (typeof window !== "undefined" && "serviceWorker" in navigator) {
           navigator.serviceWorker.ready.then((registration) => {
             registration.showNotification(title, {
@@ -71,32 +69,28 @@ export async function POST(request: Request) {
               badge: "/favicon.ico",
               tag: `order-${data?.orderId}`,
               requireInteraction: true,
-              // vibrate y sound eliminados para evitar errores de tipo
-            });
-          });
+            })
+          })
         }
 
-        return true;
+        return true
       } catch (error) {
-        console.error("Error enviando push notification:", error);
-        return false;
+        console.error("Error enviando push notification:", error)
+        return false
       }
-    });
+    })
 
-    const results = await Promise.all(pushPromises);
-    const successCount = results.filter(Boolean).length;
+    const results = await Promise.all(pushPromises)
+    const successCount = results.filter(Boolean).length
 
     return NextResponse.json({
       success: true,
       sent: successCount,
       total: subscriptions.length,
       message: `Notificación de lista de pedido enviada a ${successCount} administradores`,
-    });
+    })
   } catch (error) {
-    console.error("Error broadcasting notifications:", error);
-    return NextResponse.json(
-      { error: "Failed to broadcast notifications" },
-      { status: 500 }
-    );
+    console.error("Error broadcasting notifications:", error)
+    return NextResponse.json({ error: "Failed to broadcast notifications" }, { status: 500 })
   }
 }

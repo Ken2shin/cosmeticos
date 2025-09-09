@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
+import { validateDatabaseUrl } from "@/lib/env-validation"
 
-const sql = neon(process.env.DATABASE_URL!)
+const sql = neon(validateDatabaseUrl())
 
 export async function GET() {
   try {
