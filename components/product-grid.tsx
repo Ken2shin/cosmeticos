@@ -6,9 +6,10 @@ import type { Product } from "@/types/product"
 
 interface ProductGridProps {
   selectedCategory: string
+  searchTerm?: string
 }
 
-export function ProductGrid({ selectedCategory }: ProductGridProps) {
+export function ProductGrid({ selectedCategory, searchTerm = "" }: ProductGridProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -18,18 +19,46 @@ export function ProductGrid({ selectedCategory }: ProductGridProps) {
 
   const fetchProducts = async () => {
     try {
+      console.log("[v0] Fetching products from client side...")
       const response = await fetch("/api/products")
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
       const data = await response.json()
-      setProducts(data)
+      console.log("[v0] Products fetched successfully:", data)
+      setProducts(data || [])
     } catch (error) {
-      console.error("Error fetching products:", error)
+      console.error("[v0] Error fetching products:", error)
+      setProducts([])
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredProducts =
-    selectedCategory === "all" ? products : products.filter((product) => product.category === selectedCategory)
+  const filteredProducts = products.filter((product) => {
+    // Category filter
+    const categoryMatch =
+      selectedCategory === "all" || (product.category?.toLowerCase() || "") === selectedCategory.toLowerCase()
+
+    // Search filter
+    const searchMatch =
+      searchTerm === "" ||
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.brand && product.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
+
+    return categoryMatch && searchMatch
+  })
+
+  console.log("[v0] Current state:", {
+    selectedCategory,
+    searchTerm,
+    totalProducts: products.length,
+    filteredProducts: filteredProducts.length,
+    loading,
+  })
 
   if (loading) {
     return (
@@ -48,7 +77,17 @@ export function ProductGrid({ selectedCategory }: ProductGridProps) {
   if (filteredProducts.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground text-lg">No se encontraron productos en esta categoría.</p>
+        <p className="text-muted-foreground text-lg">
+          {searchTerm
+            ? `No se encontraron productos que coincidan con "${searchTerm}"`
+            : "No se encontraron productos en esta categoría."}
+        </p>
+        {products.length > 0 && (
+          <p className="text-sm text-muted-foreground mt-2">
+            Total productos disponibles: {products.length} | Categoría: "{selectedCategory}" |
+            {searchTerm && `Búsqueda: "${searchTerm}"`}
+          </p>
+        )}
       </div>
     )
   }

@@ -6,9 +6,22 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CartSidebar } from "@/components/cart/cart-sidebar"
 import { useAuth } from "@/components/auth/auth-provider"
+import { useState } from "react"
 
-export function Header() {
+interface HeaderProps {
+  onSearchChange?: (searchTerm: string) => void
+}
+
+export function Header({ onSearchChange }: HeaderProps) {
   const { isAdmin } = useAuth()
+  const [searchTerm, setSearchTerm] = useState("")
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value)
+    if (onSearchChange) {
+      onSearchChange(value)
+    }
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/60 animate-in slide-in-from-top-4 duration-1000">
@@ -27,6 +40,8 @@ export function Header() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-rose-500 transition-colors duration-200" />
             <Input
               placeholder="Buscar productos..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 hover:border-rose-300"
             />
           </div>

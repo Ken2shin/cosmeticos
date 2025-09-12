@@ -16,29 +16,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
+    setIsClient(true)
     checkAuth()
   }, [])
 
   const checkAuth = async () => {
     try {
-      console.log("[v0] Checking authentication status")
       const response = await fetch("/api/auth/check")
       const isAuth = response.ok
-      console.log("[v0] Authentication check result:", isAuth)
       setIsAuthenticated(isAuth)
       setIsAdmin(isAuth)
 
-      if (!isAuth && window.location.pathname.startsWith("/admin") && window.location.pathname !== "/admin/login") {
-        console.log("[v0] Not authenticated, redirecting to login")
-        if (typeof window !== "undefined") {
-          window.location.href = "/admin/login"
-        }
+      if (
+        !isAuth &&
+        isClient &&
+        typeof window !== "undefined" &&
+        window.location.pathname.startsWith("/admin") &&
+        window.location.pathname !== "/admin/login"
+      ) {
+        window.location.href = "/admin/login"
         return
       }
     } catch (error) {
-      console.error("[v0] Auth check error:", error)
+      console.error("Auth check error:", error)
       setIsAuthenticated(false)
       setIsAdmin(false)
     } finally {
@@ -48,23 +51,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      console.log("[v0] Logging out")
       await fetch("/api/auth/logout", { method: "POST" })
       setIsAuthenticated(false)
       setIsAdmin(false)
       document.cookie = "admin-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
-      if (typeof window !== "undefined") {
+      if (isClient && typeof window !== "undefined") {
         window.location.href = "/admin/login"
       }
     } catch (error) {
-      console.error("[v0] Logout error:", error)
+      console.error("Logout error:", error)
       setIsAuthenticated(false)
       setIsAdmin(false)
       document.cookie = "admin-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
-      if (typeof window !== "undefined") {
+      if (isClient && typeof window !== "undefined") {
         window.location.href = "/admin/login"
       }
     }
+  }
+
+  if (!isClient) {
+    return (
+      <AuthContext.Provider value={{ isAuthenticated: false, isLoading: true, isAdmin: false, logout }}>
+        {children}
+      </AuthContext.Provider>
+    )
   }
 
   if (isLoading && typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {

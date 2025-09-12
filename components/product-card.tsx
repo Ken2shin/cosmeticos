@@ -63,7 +63,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{product.description}</p>
           <div className="flex items-center justify-between">
             <span className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
-              ${product.price}
+              C${product.price}
             </span>
             <span className="text-sm text-muted-foreground font-medium">{product.brand}</span>
           </div>

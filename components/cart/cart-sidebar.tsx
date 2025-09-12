@@ -78,7 +78,7 @@ export function CartSidebar() {
                     <div className="flex-1 space-y-3">
                       <h4 className="font-medium text-base line-clamp-2">{item.name}</h4>
                       <div className="flex items-center justify-between">
-                        <p className="text-rose-600 font-bold text-lg">${item.price}</p>
+                        <p className="text-rose-600 font-bold text-lg">C${item.price}</p>
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1">
                             <Button
@@ -113,7 +113,7 @@ export function CartSidebar() {
                       </div>
                       <div className="text-right">
                         <span className="text-sm text-gray-600">Subtotal: </span>
-                        <span className="font-semibold text-rose-600">${(item.price * item.quantity).toFixed(2)}</span>
+                        <span className="font-semibold text-rose-600">C${(item.price * item.quantity).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -123,7 +123,7 @@ export function CartSidebar() {
               <div className="border-t pt-6 space-y-4 bg-gradient-to-r from-rose-50 to-pink-50 -mx-6 px-6 pb-6">
                 <div className="flex justify-between items-center text-xl font-bold bg-white p-4 rounded-lg shadow-sm">
                   <span>Total a Pagar:</span>
-                  <span className="text-rose-600">${state.total.toFixed(2)}</span>
+                  <span className="text-rose-600">C${state.total.toFixed(2)}</span>
                 </div>
 
                 <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">

@@ -9,16 +9,38 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Invalid order ID" }, { status: 400 })
     }
 
-    // Get order details with items
+    type OrderItem = {
+      id: number;
+      product_id: number;
+      quantity: number;
+      unit_price: number;
+      total_price: number;
+      product_name: string | null;
+      product_brand: string | null;
+    };
+
+    type Order = {
+      id: number;
+      customer_name: string;
+      customer_email: string;
+      customer_phone?: string;
+      created_at: string;
+      status: string;
+      total_amount: number;
+      items: OrderItem[];
+    };
+
     const orderResult = await sql`
       SELECT o.*, 
              json_agg(
-               json_build_object(
-                 'product_name', p.name,
-                 'product_brand', p.brand,
+    const order = orderResult[0] as Order;
+                 'id', oi.id,
+                 'product_id', oi.product_id,
                  'quantity', oi.quantity,
                  'unit_price', oi.unit_price,
-                 'total_price', oi.total_price
+                 'total_price', oi.total_price,
+                 'product_name', COALESCE(p.name, 'Producto'),
+                 'product_brand', p.brand
                ) ORDER BY oi.id
              ) as items
       FROM orders o
@@ -32,119 +54,100 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
-    const order = orderResult[0]
+    const order = orderResult[0] as Order
 
-    // Generate invoice HTML
-    const invoiceHtml = generateInvoiceHtml(order)
+    const invoiceHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Factura #${order.id}</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #e91e63; padding-bottom: 20px; }
+            .company-name { font-size: 28px; font-weight: bold; color: #e91e63; margin-bottom: 5px; }
+            .invoice-title { font-size: 24px; margin: 20px 0; }
+            .info-section { display: flex; justify-content: space-between; margin: 20px 0; }
+            .info-box { width: 45%; }
+            .info-box h3 { color: #e91e63; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+            .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            .items-table th, .items-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+            .items-table th { background-color: #f8f9fa; font-weight: bold; }
+            .total-section { text-align: right; margin-top: 20px; }
+            .total-amount { font-size: 24px; font-weight: bold; color: #e91e63; }
+            .footer { margin-top: 40px; text-align: center; color: #666; font-size: 12px; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="company-name">Beauty Catalog</div>
+            <div>Catálogo de Productos de Belleza</div>
+        </div>
 
-    return new NextResponse(invoiceHtml, {
+        <div class="invoice-title">FACTURA #${order.id}</div>
+
+        <div class="info-section">
+            <div class="info-box">
+                <h3>Información del Cliente</h3>
+                <p><strong>Nombre:</strong> ${order.customer_name}</p>
+                <p><strong>Email:</strong> ${order.customer_email}</p>
+                ${order.customer_phone ? `<p><strong>Teléfono:</strong> ${order.customer_phone}</p>` : ""}
+            </div>
+            <div class="info-box">
+                <h3>Información del Pedido</h3>
+                <p><strong>Fecha:</strong> ${new Date(order.created_at).toLocaleDateString("es-ES")}</p>
+                <p><strong>Estado:</strong> ${order.status === "pending" ? "Pendiente" : order.status === "completed" ? "Completado" : "Cancelado"}</p>
+            </div>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Marca</th>
+                    <th>Cantidad</th>
+                    <th>Precio Unitario</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${order.items
+                  .filter((item: OrderItem) => item.product_name)
+                  .map(
+                    (item) => `
+                    <tr>
+                        <td>${item.product_name}</td>
+                        <td>${item.product_brand || "-"}</td>
+                        <td>${item.quantity}</td>
+                        <td>C$${Number(item.unit_price).toFixed(2)}</td>
+                        <td>C$${Number(item.total_price).toFixed(2)}</td>
+                    </tr>
+                `,
+                  )
+                  .join("")}
+            </tbody>
+        </table>
+
+        <div class="total-section">
+            <div class="total-amount">TOTAL: C$${Number(order.total_amount).toFixed(2)}</div>
+        </div>
+
+        <div class="footer">
+            <p>Gracias por su compra en Beauty Catalog</p>
+            <p>Factura generada el ${new Date().toLocaleDateString("es-ES")}</p>
+        </div>
+    </body>
+    </html>
+    `
+
+    return new Response(invoiceHTML, {
       headers: {
         "Content-Type": "text/html",
-        "Content-Disposition": `inline; filename="factura-${orderId}.html"`,
+        "Content-Disposition": `inline; filename="factura-${order.id}.html"`,
       },
     })
   } catch (error) {
     console.error("Error generating invoice:", error)
     return NextResponse.json({ error: "Failed to generate invoice" }, { status: 500 })
   }
-}
-
-function generateInvoiceHtml(order: any) {
-  const items = order.items.filter((item: any) => item.product_name !== null)
-  const subtotal = items.reduce((sum: number, item: any) => sum + Number.parseFloat(item.total_price), 0)
-  const tax = subtotal * 0.15 // 15% tax
-  const total = subtotal + tax
-
-  return `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Factura #${order.id} - Beauty Catalog</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .invoice { max-width: 800px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 2px solid #e91e63; padding-bottom: 20px; }
-        .logo { font-size: 24px; font-weight: bold; color: #e91e63; }
-        .invoice-info { text-align: right; }
-        .customer-info { margin-bottom: 30px; }
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-        .items-table th, .items-table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        .items-table th { background-color: #f8f9fa; font-weight: bold; }
-        .totals { text-align: right; }
-        .totals div { margin: 5px 0; }
-        .total-final { font-size: 18px; font-weight: bold; color: #e91e63; border-top: 2px solid #e91e63; padding-top: 10px; }
-        .footer { margin-top: 40px; text-align: center; color: #666; font-size: 12px; }
-        @media print { body { background: white; } .invoice { box-shadow: none; } }
-      </style>
-    </head>
-    <body>
-      <div class="invoice">
-        <div class="header">
-          <div class="logo">🌸 Beauty Catalog</div>
-          <div class="invoice-info">
-            <h2>FACTURA</h2>
-            <p><strong>Número:</strong> #${order.id}</p>
-            <p><strong>Fecha:</strong> ${new Date(order.created_at).toLocaleDateString("es-ES")}</p>
-            <p><strong>Estado:</strong> ${order.status === "pending" ? "Pendiente" : order.status === "completed" ? "Completado" : "Cancelado"}</p>
-          </div>
-        </div>
-
-        <div class="customer-info">
-          <h3>Información del Cliente</h3>
-          <p><strong>Nombre:</strong> ${order.customer_name}</p>
-          <p><strong>Email:</strong> ${order.customer_email}</p>
-          ${order.customer_phone ? `<p><strong>Teléfono:</strong> ${order.customer_phone}</p>` : ""}
-        </div>
-
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Marca</th>
-              <th>Cantidad</th>
-              <th>Precio Unitario</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items
-              .map(
-                (item: any) => `
-              <tr>
-                <td>${item.product_name}</td>
-                <td>${item.product_brand || "-"}</td>
-                <td>${item.quantity}</td>
-                <td>$${Number.parseFloat(item.unit_price).toFixed(2)}</td>
-                <td>$${Number.parseFloat(item.total_price).toFixed(2)}</td>
-              </tr>
-            `,
-              )
-              .join("")}
-          </tbody>
-        </table>
-
-        <div class="totals">
-          <div>Subtotal: $${subtotal.toFixed(2)}</div>
-          <div>Impuestos (15%): $${tax.toFixed(2)}</div>
-          <div class="total-final">Total: $${total.toFixed(2)}</div>
-        </div>
-
-        <div class="footer">
-          <p>Gracias por su compra en Beauty Catalog</p>
-          <p>Para consultas, contacte a: info@beautycatalog.com</p>
-        </div>
-      </div>
-
-      <script>
-        if (typeof window !== "undefined") {
-          window.onload = function() {
-            setTimeout(() => window.print(), 500);
-          }
-        }
-      </script>
-    </body>
-    </html>
-  `
 }

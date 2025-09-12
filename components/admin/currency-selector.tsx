@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Currency {
@@ -15,27 +15,31 @@ interface CurrencySelectorProps {
   onValueChange: (value: string) => void
 }
 
+const DEFAULT_CURRENCIES: Currency[] = [{ code: "NIO", name: "Córdoba Nicaragüense", symbol: "C$", flag_emoji: "🇳🇮" }]
+
 export function CurrencySelector({ value, onValueChange }: CurrencySelectorProps) {
-  const [currencies, setCurrencies] = useState<Currency[]>([])
+  const [currencies] = useState<Currency[]>(DEFAULT_CURRENCIES)
+  const [loading] = useState(false)
+
+  const handleValueChange = useCallback(
+    (newValue: string) => {
+      if (newValue !== value) {
+        onValueChange(newValue)
+      }
+    },
+    [value, onValueChange],
+  )
 
   useEffect(() => {
-    fetchCurrencies()
-  }, [])
-
-  const fetchCurrencies = async () => {
-    try {
-      const response = await fetch("/api/currencies")
-      const data = await response.json()
-      setCurrencies(data)
-    } catch (error) {
-      console.error("Error fetching currencies:", error)
+    if (!value) {
+      onValueChange("NIO")
     }
-  }
+  }, []) // Removed dependencies to prevent infinite loop
 
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <Select value={value || "NIO"} onValueChange={handleValueChange} disabled={loading}>
       <SelectTrigger className="transition-all duration-200 focus:ring-2 focus:ring-rose-500">
-        <SelectValue placeholder="Seleccionar moneda" />
+        <SelectValue placeholder="Córdoba Nicaragüense (C$)" />
       </SelectTrigger>
       <SelectContent>
         {currencies.map((currency) => (

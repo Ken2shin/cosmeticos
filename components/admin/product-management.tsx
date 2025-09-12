@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Edit, Trash2, Eye, EyeOff } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import type { Product } from "@/types/product"
 import { ProductForm } from "@/components/admin/product-form"
 
@@ -13,7 +14,8 @@ export function ProductManagement() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [deleteLoading, setDeleteLoading] = useState(false) // Add loading state during deletion
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
     fetchProducts()
@@ -25,14 +27,17 @@ export function ProductManagement() {
       const response = await fetch("/api/products")
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        console.error(`[v0] HTTP error! status: ${response.status}`)
+        setProducts([])
+        return
       }
 
       const data = await response.json()
       console.log("[v0] Products fetched successfully:", data.length)
-      setProducts(data)
+      setProducts(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error("[v0] Error fetching products:", error)
+      setProducts([])
     } finally {
       setLoading(false)
     }
@@ -45,7 +50,7 @@ export function ProductManagement() {
 
   const handleDelete = async (productId: number) => {
     if (confirm("¿Estás seguro de que quieres eliminar este producto?")) {
-      setDeleteLoading(true) // Add loading state during deletion
+      setDeleteLoading(true)
       try {
         const response = await fetch(`/api/products/${productId}`, { method: "DELETE" })
 
@@ -55,14 +60,22 @@ export function ProductManagement() {
           throw new Error(data.error || `HTTP error! status: ${response.status}`)
         }
 
-        alert("Producto eliminado exitosamente")
+        toast({
+          title: "Producto eliminado",
+          description: "El producto se ha eliminado exitosamente del catálogo.",
+          variant: "default",
+        })
         await fetchProducts()
       } catch (error) {
         console.error("[v0] Error deleting product:", error)
         const errorMessage = error instanceof Error ? error.message : "Error desconocido al eliminar el producto"
-        alert(`Error al eliminar el producto: ${errorMessage}`)
+        toast({
+          title: "Error al eliminar",
+          description: errorMessage,
+          variant: "destructive",
+        })
       } finally {
-        setDeleteLoading(false) // Add loading state during deletion
+        setDeleteLoading(false)
       }
     }
   }
@@ -85,11 +98,19 @@ export function ProductManagement() {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      alert(`Producto ${!currentStatus ? "activado" : "desactivado"} exitosamente`)
+      toast({
+        title: `Producto ${!currentStatus ? "activado" : "desactivado"}`,
+        description: `${product.name} se ha ${!currentStatus ? "activado" : "desactivado"} exitosamente.`,
+        variant: "default",
+      })
       fetchProducts()
     } catch (error) {
       console.error("[v0] Error toggling product status:", error)
-      alert("Error al cambiar el estado del producto")
+      toast({
+        title: "Error",
+        description: "No se pudo cambiar el estado del producto. Intenta de nuevo.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -118,7 +139,7 @@ export function ProductManagement() {
         </Button>
       </div>
 
-      {loading || deleteLoading ? ( // Add loading state during deletion
+      {loading || deleteLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -160,10 +181,7 @@ export function ProductManagement() {
                 )}
                 <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{product.description}</p>
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-xl font-bold text-rose-600">
-                    {product.currency_code === "USD" ? "$" : "C$"}
-                    {product.price}
-                  </span>
+                  <span className="text-xl font-bold text-rose-600">C${product.price}</span>
                   <span className="text-sm text-muted-foreground">Stock: {product.stock_quantity}</span>
                 </div>
                 <div className="flex gap-2">
@@ -189,7 +207,7 @@ export function ProductManagement() {
                     size="sm"
                     onClick={() => handleDelete(product.id)}
                     className="text-destructive hover:text-destructive hover:bg-red-50 hover:border-red-300 transition-colors"
-                    disabled={deleteLoading} // Disable button during deletion
+                    disabled={deleteLoading}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

@@ -16,19 +16,19 @@ export function AdminWebSocket() {
       // Mostrar notificación del navegador
       if ("Notification" in window && Notification.permission === "granted") {
         const notification = new Notification("🛍️ Nuevo Pedido Recibido", {
-          body: `${data.customerName} (${data.customerPhone})\nTotal: ${data.currency === "USD" ? "$" : "C$"}${data.total}`,
+          body: `${data.customerName} (${data.customerPhone})\nTotal: C$${data.total}`,
           icon: "/favicon.ico",
           badge: "/favicon.ico",
           tag: "new-order",
           requireInteraction: true,
-          actions: [
-            { action: "view", title: "Ver Pedido" },
-            { action: "dismiss", title: "Cerrar" },
-          ],
-        } as any)
+          // Note: The 'actions' property is not supported in the standard Notification API
+          // and has been removed to avoid type errors.
+        })
 
         notification.onclick = () => {
-          window.focus()
+          if (typeof window !== "undefined") {
+            window.focus()
+          }
           // Navegar a la sección de pedidos
           const ordersTab = document.querySelector('[value="orders"]') as HTMLElement
           if (ordersTab) ordersTab.click()
@@ -40,10 +40,7 @@ export function AdminWebSocket() {
       }
 
       // Mostrar notificación en la página también
-      showInPageNotification(
-        `🛍️ Nuevo pedido de ${data.customerName} por ${data.currency === "USD" ? "$" : "C$"}${data.total}`,
-        "order",
-      )
+      showInPageNotification(`🛍️ Nuevo pedido de ${data.customerName} por C$${data.total}`, "order")
 
       // Reproducir sonido de notificación
       playNotificationSound()
@@ -96,6 +93,8 @@ function showInPageNotification(message: string, type: "order" | "info" = "info"
 }
 
 function playNotificationSound() {
+  if (typeof window === "undefined") return
+
   // Crear y reproducir sonido de notificación
   const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
   const oscillator = audioContext.createOscillator()

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -13,6 +13,7 @@ import { ArrowLeft, Plus } from "lucide-react"
 import { FileUpload } from "@/components/upload/file-upload"
 import { CurrencySelector } from "./currency-selector"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
 import type { Product } from "@/types/product"
 
 interface ProductFormProps {
@@ -31,6 +32,7 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
   const [uploading, setUploading] = useState(false)
   const [showNewCategory, setShowNewCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
+  const { toast } = useToast()
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -41,10 +43,24 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
     stock_quantity: "",
     currency_code: "USD",
     is_active: true,
+    sku: "",
   })
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await fetch("/api/categories")
+      const data = await response.json()
+      setCategories(data)
+    } catch (error) {
+      console.error("Error fetching categories:", error)
+    }
+  }, [])
 
   useEffect(() => {
     fetchCategories()
+  }, [fetchCategories])
+
+  useEffect(() => {
     if (product) {
       setFormData({
         name: product.name,
@@ -56,19 +72,10 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
         stock_quantity: product.stock_quantity.toString(),
         currency_code: product.currency_code || "USD",
         is_active: product.is_active,
+        sku: product.sku || "",
       })
     }
   }, [product])
-
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch("/api/categories")
-      const data = await response.json()
-      setCategories(data)
-    } catch (error) {
-      console.error("Error fetching categories:", error)
-    }
-  }
 
   const uploadFile = async (file: File): Promise<string> => {
     console.log("[v0] Starting file upload:", file.name)
@@ -108,10 +115,29 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
         setFormData({ ...formData, category: newCategoryName.trim() })
         setNewCategoryName("")
         setShowNewCategory(false)
+        toast({
+          title: "Categoría creada",
+          description: `La categoría "${newCategoryName.trim()}" se ha creado exitosamente.`,
+          variant: "default",
+        })
       }
     } catch (error) {
       console.error("Error adding category:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo crear la categoría. Intenta de nuevo.",
+        variant: "destructive",
+      })
     }
+  }
+
+  const generateSKU = () => {
+    const prefix = formData.name.substring(0, 3).toUpperCase()
+    const timestamp = Date.now().toString().slice(-6)
+    const randomNum = Math.floor(Math.random() * 100)
+      .toString()
+      .padStart(2, "0")
+    return `${prefix}${timestamp}${randomNum}`
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -126,11 +152,14 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
         imageUrl = await uploadFile(selectedFile)
       }
 
+      const finalSKU = formData.sku.trim() || generateSKU()
+
       const productData = {
         ...formData,
         image_url: imageUrl,
         price: Number.parseFloat(formData.price),
         stock_quantity: Number.parseInt(formData.stock_quantity),
+        sku: finalSKU,
       }
 
       console.log("[v0] Submitting product data:", productData)
@@ -150,9 +179,17 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
       }
 
       if (product) {
-        alert("Producto actualizado exitosamente")
+        toast({
+          title: "¡Producto actualizado!",
+          description: `${formData.name} se ha actualizado exitosamente.`,
+          variant: "default",
+        })
       } else {
-        alert("Producto creado exitosamente")
+        toast({
+          title: "¡Producto creado!",
+          description: `${formData.name} se ha creado exitosamente y está disponible en el catálogo.`,
+          variant: "default",
+        })
       }
 
       if (response.ok && !product) {
@@ -181,7 +218,11 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
       onClose()
     } catch (error) {
       console.error("[v0] Error saving product:", error)
-      alert(`Error: ${error instanceof Error ? error.message : "Unknown error"}`)
+      toast({
+        title: "Error al guardar",
+        description: error instanceof Error ? error.message : "Error desconocido al guardar el producto",
+        variant: "destructive",
+      })
     } finally {
       setUploading(false)
     }
@@ -214,6 +255,30 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="sku">SKU (Código del Producto)</Label>
+              <Input
+                id="sku"
+                value={formData.sku}
+                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                placeholder="Se generará automáticamente si se deja vacío"
+                className="transition-all duration-200 focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+                className="transition-all duration-200 focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="brand">Marca</Label>
               <Input
                 id="brand"
@@ -222,17 +287,6 @@ export function ProductForm({ product, onClose }: ProductFormProps) {
                 className="transition-all duration-200 focus:ring-2 focus:ring-rose-500"
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Descripción</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={3}
-              className="transition-all duration-200 focus:ring-2 focus:ring-rose-500"
-            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

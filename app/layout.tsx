@@ -2,11 +2,11 @@ import type React from "react"
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
-import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "next-themes"
 import { CartProvider } from "@/contexts/cart-context"
 import { AuthProvider } from "@/components/auth/auth-provider"
 import { Suspense } from "react"
+import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -29,8 +29,8 @@ export default function RootLayout({
               <CartProvider>{children}</CartProvider>
             </AuthProvider>
           </Suspense>
+          <Toaster />
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   )

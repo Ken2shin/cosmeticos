@@ -10,6 +10,8 @@ export interface Product {
   is_active: boolean
   created_at: string
   updated_at: string
+  sku: string
+  currency_code?: string
 }
 
 export interface Category {

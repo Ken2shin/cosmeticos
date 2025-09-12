@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import { ProductCatalog } from "@/components/product-catalog"
-import { HeaderWrapper } from "@/components/header-wrapper"
 import { Hero } from "@/components/hero"
+import { Header } from "@/components/header" // Added header import
 import { NotificationPermission } from "@/components/notifications/notification-permission"
 import { ClientWebSocket } from "@/components/websocket/client-websocket"
 import { ClientNotificationModule } from "@/components/notifications/client-notification-module"
@@ -9,7 +9,7 @@ import { ClientNotificationModule } from "@/components/notifications/client-noti
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
-      <HeaderWrapper />
+      <Header />
       <Hero />
       <main className="container mx-auto px-4 py-8">
         <NotificationPermission userType="client" />
