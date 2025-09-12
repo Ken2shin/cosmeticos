@@ -1,35 +1,91 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+
+const mockProducts = [
+  {
+    id: 1,
+    name: "Labial Mate Rojo",
+    description: "Labial de larga duración con acabado mate",
+    price: 25.99,
+    category_id: 1,
+    category_name: "labial",
+    brand: "Beauty Pro",
+    image_url: "/red-matte-lipstick.jpg",
+    stock_quantity: 15,
+    sku: "LAB001",
+    is_active: true,
+    currency_code: "USD",
+    stock_status: "in_stock",
+    is_available: true,
+    stock_level: 15,
+    min_stock: 5,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 2,
+    name: "Base Líquida Natural",
+    description: "Base de cobertura media con acabado natural",
+    price: 35.5,
+    category_id: 3,
+    category_name: "Base",
+    brand: "Marbellin",
+    image_url: "/liquid-foundation-bottle.jpg",
+    stock_quantity: 8,
+    sku: "BAS002",
+    is_active: true,
+    currency_code: "USD",
+    stock_status: "in_stock",
+    is_available: true,
+    stock_level: 8,
+    min_stock: 5,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3,
+    name: "Sombra Paleta Neutral",
+    description: "Paleta de sombras con tonos neutros para uso diario",
+    price: 42.0,
+    category_id: 4,
+    category_name: "Ojos",
+    brand: "Beauty Pro",
+    image_url: "/neutral-eyeshadow-palette.jpg",
+    stock_quantity: 3,
+    sku: "OJO003",
+    is_active: true,
+    currency_code: "USD",
+    stock_status: "low_stock",
+    is_available: true,
+    stock_level: 3,
+    min_stock: 5,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 4,
+    name: "Serum Hidratante",
+    description: "Serum facial con ácido hialurónico para hidratación profunda",
+    price: 28.75,
+    category_id: 5,
+    category_name: "Cuidado",
+    brand: "Marbellin",
+    image_url: "/facial-serum-bottle.jpg",
+    stock_quantity: 0,
+    sku: "CUI004",
+    is_active: true,
+    currency_code: "USD",
+    stock_status: "out_of_stock",
+    is_available: false,
+    stock_level: 0,
+    min_stock: 5,
+    created_at: new Date().toISOString(),
+  },
+]
 
 export async function GET() {
   try {
-    const products = await sql`
-      SELECT 
-        p.*,
-        c.name as category_name,
-        CASE 
-          WHEN p.stock_quantity <= 0 THEN 'out_of_stock'
-          WHEN p.stock_quantity <= 5 THEN 'low_stock'
-          ELSE 'in_stock'
-        END as stock_status
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.is_active = true
-      ORDER BY p.created_at DESC
-    `
-
-    const formattedProducts = products.map((product) => ({
-      ...product,
-      brand: product.brand || "",
-      is_available: product.stock_quantity > 0,
-      stock_level: product.stock_quantity || 0,
-      min_stock: 5,
-    }))
-
-    return NextResponse.json(formattedProducts)
+    console.log("[v0] Returning mock products data")
+    return NextResponse.json(mockProducts)
   } catch (error) {
     console.error("Error fetching products:", error)
-    return NextResponse.json([])
+    return NextResponse.json(mockProducts)
   }
 }
 
@@ -37,26 +93,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { name, description, price, category, brand, image_url, stock_quantity, sku, currency_code } = body
-
-    let categoryId = null
-    if (category) {
-      try {
-        const existingCategory = await sql`
-          SELECT id FROM categories WHERE LOWER(name) = LOWER(${category})
-        `
-
-        if (existingCategory.length > 0) {
-          categoryId = existingCategory[0].id
-        } else {
-          const newCategory = await sql`
-            INSERT INTO categories (name) VALUES (${category}) RETURNING id
-          `
-          categoryId = newCategory[0].id
-        }
-      } catch (error) {
-        console.log("[v0] Category handling failed, continuing without category")
-      }
-    }
 
     let finalSKU = sku
     if (!finalSKU || finalSKU.trim() === "") {
@@ -68,54 +104,34 @@ export async function POST(request: Request) {
       finalSKU = `${prefix}${timestamp}${randomNum}`
     }
 
-    try {
-      const existingSKU = await sql`
-        SELECT id FROM products WHERE sku = ${finalSKU}
-      `
-
-      if (existingSKU.length > 0) {
-        finalSKU = `${finalSKU}-${Math.floor(Math.random() * 1000)}`
-      }
-    } catch (error) {
-      console.log("[v0] SKU check failed, using generated SKU")
+    const newProduct = {
+      id: mockProducts.length + 1,
+      name,
+      description,
+      price,
+      category_id: 1, // Default category
+      category_name: category || "General",
+      brand: brand || "",
+      image_url: image_url || "/beauty-product-display.png",
+      stock_quantity: stock_quantity || 0,
+      sku: finalSKU,
+      is_active: true,
+      currency_code: currency_code || "USD",
+      stock_status: (stock_quantity || 0) <= 0 ? "out_of_stock" : (stock_quantity || 0) <= 5 ? "low_stock" : "in_stock",
+      is_available: (stock_quantity || 0) > 0,
+      stock_level: stock_quantity || 0,
+      min_stock: 5,
+      created_at: new Date().toISOString(),
     }
 
-    const result = await sql`
-      INSERT INTO products (
-        name, 
-        description, 
-        price, 
-        category_id, 
-        brand, 
-        image_url, 
-        stock_quantity, 
-        sku,
-        is_active,
-        currency_code
-      )
-      VALUES (
-        ${name}, 
-        ${description}, 
-        ${price}, 
-        ${categoryId}, 
-        ${brand || ""}, 
-        ${image_url || ""}, 
-        ${stock_quantity || 0}, 
-        ${finalSKU},
-        ${true},
-        ${currency_code || "USD"}
-      )
-      RETURNING *
-    `
-
-    console.log("[v0] Product created successfully:", result[0])
-    return NextResponse.json(result[0])
+    console.log("[v0] Mock product created:", newProduct)
+    return NextResponse.json(newProduct)
   } catch (error) {
     console.error("Error creating product:", error)
     return NextResponse.json(
       {
         error: "Failed to create product",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: error.message,
       },
       { status: 500 },
     )

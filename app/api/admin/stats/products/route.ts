@@ -6,7 +6,7 @@ import { validateDatabaseUrl } from "@/lib/env-validation"
 
 const sql = neon(validateDatabaseUrl())
 
-export async function GET() {
+export async function GET({ params }: { params: { adminProductId: string } }) {
   try {
     console.log("[v0] Admin products API called")
 
@@ -20,33 +20,27 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    console.log("[v0] Fetching admin products from database")
+    console.log("[v0] Fetching admin product from database")
 
-    try {
-      await sql`SELECT 1 FROM products LIMIT 1`
-      console.log("[v0] Products table exists")
-    } catch (tableError) {
-      console.error("[v0] Products table does not exist:", tableError)
-      return NextResponse.json(
-        { error: "Database table not found", details: "Products table does not exist" },
-        { status: 500 },
-      )
-    }
+    const id = Number.parseInt(params.adminProductId)
 
-    const products = await sql`
+    const product = await sql`
       SELECT p.*, c.symbol as currency_symbol, c.flag_emoji as currency_flag
       FROM products p
       LEFT JOIN currencies c ON p.currency_code = c.code
-      ORDER BY p.created_at DESC
+      WHERE p.id = ${id}
     `
 
-    console.log("[v0] Products fetched successfully:", products.length)
-    return NextResponse.json(products)
+    if (product.length === 0) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 })
+    }
+
+    return NextResponse.json(product[0])
   } catch (error) {
-    console.error("[v0] Error fetching admin products:", error)
+    console.error("[v0] Error fetching admin product:", error)
     return NextResponse.json(
       {
-        error: "Failed to fetch products",
+        error: "Failed to fetch product",
         details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },

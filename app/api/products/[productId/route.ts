@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: { productId: string } }) {
   try {
     const body = await request.json()
     const { name, description, price, category, brand, image_url, stock_quantity, is_active } = body
-    const id = Number.parseInt(params.id)
+    const id = Number.parseInt(params.productId)
 
     const result = await sql`
       UPDATE products 
@@ -24,9 +24,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: { productId: string } }) {
   try {
-    const id = Number.parseInt(params.id)
+    const id = Number.parseInt(params.productId)
 
     const existingProduct = await sql`SELECT id FROM products WHERE id = ${id}`
 

@@ -16,7 +16,7 @@ export function ClientWebSocket() {
       // Mostrar notificación del navegador
       if ("Notification" in window && Notification.permission === "granted") {
         const notification = new Notification("🆕 Nuevo Producto Disponible", {
-          body: `${data.name} - ${data.currency === "USD" ? "$" : "C$"}${data.price}`,
+          body: `${data.name} - C$${data.price}`,
           icon: "/favicon.ico",
           badge: "/favicon.ico",
           tag: "new-product",
@@ -24,7 +24,9 @@ export function ClientWebSocket() {
         })
 
         notification.onclick = () => {
-          window.focus()
+          if (typeof window !== "undefined") {
+            window.focus()
+          }
           notification.close()
         }
 
@@ -50,7 +52,9 @@ export function ClientWebSocket() {
         })
 
         notification.onclick = () => {
-          window.focus()
+          if (typeof window !== "undefined") {
+            window.focus()
+          }
           notification.close()
         }
 
