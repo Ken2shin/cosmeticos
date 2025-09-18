@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { toast } from "@/components/ui/use-toast"
+import { DialogDescription } from "@/components/ui/dialog"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -871,19 +872,26 @@ export function CustomerManagement() {
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent>
+        <DialogContent aria-describedby="customer-form-description">
           <DialogHeader>
             <DialogTitle>{editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}</DialogTitle>
+            <DialogDescription id="customer-form-description">
+              {editingCustomer
+                ? "Modifica la información del cliente seleccionado."
+                : "Completa los datos para registrar un nuevo cliente en el sistema."}
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="name">Nombre *</Label>
+              <Label htmlFor="customer-name">Nombre *</Label>
               <Input
-                id="name"
+                id="customer-name"
+                name="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
+                aria-describedby="customer-form-description"
               />
             </div>
 

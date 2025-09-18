@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: { orderId: string } }) {
   try {
-    const orderId = Number.parseInt(params.id)
+    const orderId = Number.parseInt(params.orderId)
 
     if (isNaN(orderId) || orderId <= 0) {
       return NextResponse.json({ error: "ID de pedido inválido" }, { status: 400 })
@@ -41,9 +41,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: { orderId: string } }) {
   try {
-    const orderId = Number.parseInt(params.id)
+    const orderId = Number.parseInt(params.orderId)
 
     if (isNaN(orderId) || orderId <= 0) {
       return NextResponse.json({ error: "ID de pedido inválido" }, { status: 400 })
@@ -101,9 +101,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: { orderId: string } }) {
   try {
-    const orderId = Number.parseInt(params.id)
+    const orderId = Number.parseInt(params.orderId)
 
     if (isNaN(orderId) || orderId <= 0) {
       return NextResponse.json({ error: "ID de pedido inválido" }, { status: 400 })
@@ -114,7 +114,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     let result;
     await sql`BEGIN`;
     try {
-      // Check if order exists within transaction
       const orderExists = await sql`
         SELECT id, status FROM orders WHERE id = ${orderId} FOR UPDATE
       `;
@@ -125,7 +124,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
       console.log("[v0] Order exists, proceeding with deletion");
 
-      // Get order items within transaction
       const orderItems = await sql`
         SELECT oi.product_id, oi.quantity, p.name as product_name
         FROM order_items oi 
@@ -135,14 +133,12 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
       console.log("[v0] Found order items:", orderItems.length);
 
-      // Delete order items first
       const deletedItems = await sql`
         DELETE FROM order_items WHERE order_id = ${orderId}
         RETURNING *
       `;
       console.log("[v0] Deleted", deletedItems.length, "order items");
 
-      // Delete the order
       const deletedOrder = await sql`
         DELETE FROM orders WHERE id = ${orderId} RETURNING *
       `;

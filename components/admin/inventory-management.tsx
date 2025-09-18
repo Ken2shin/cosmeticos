@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -46,6 +46,7 @@ export function InventoryManagement() {
     product_id: "",
     purchase_price: "",
     purchase_quantity: "",
+    current_stock: "",
     supplier_name: "",
     supplier_contact: "",
     notes: "",
@@ -76,16 +77,20 @@ export function InventoryManagement() {
 
   const fetchProducts = async () => {
     try {
+      console.log("[v0] Fetching products for inventory selection")
       const response = await fetch("/api/products")
       if (response.ok) {
         const data = await response.json()
+        console.log("[v0] Products fetched successfully:", data.length, "products")
         setProducts(Array.isArray(data) ? data : [])
       } else {
-        console.error("Error fetching products: HTTP", response.status)
+        console.error("[v0] Error fetching products: HTTP", response.status)
+        const errorText = await response.text()
+        console.error("[v0] Error details:", errorText)
         setProducts([])
       }
     } catch (error) {
-      console.error("Error fetching products:", error)
+      console.error("[v0] Error fetching products:", error)
       setProducts([])
     }
   }
@@ -105,6 +110,7 @@ export function InventoryManagement() {
           product_id: Number.parseInt(formData.product_id),
           purchase_price: Number.parseFloat(formData.purchase_price),
           purchase_quantity: Number.parseInt(formData.purchase_quantity),
+          current_stock: Number.parseInt(formData.current_stock),
         }),
       })
 
@@ -127,6 +133,7 @@ export function InventoryManagement() {
       product_id: record.product_id.toString(),
       purchase_price: record.purchase_price.toString(),
       purchase_quantity: record.purchase_quantity.toString(),
+      current_stock: record.current_stock.toString(),
       supplier_name: record.supplier_name || "",
       supplier_contact: record.supplier_contact || "",
       notes: record.notes || "",
@@ -159,6 +166,7 @@ export function InventoryManagement() {
       product_id: "",
       purchase_price: "",
       purchase_quantity: "",
+      current_stock: "",
       supplier_name: "",
       supplier_contact: "",
       notes: "",
@@ -288,38 +296,50 @@ export function InventoryManagement() {
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" aria-describedby="inventory-form-description">
           <DialogHeader>
             <DialogTitle>{editingRecord ? "Editar Registro de Inventario" : "Nueva Compra de Inventario"}</DialogTitle>
+            <DialogDescription id="inventory-form-description">
+              {editingRecord
+                ? "Actualiza la información del registro de inventario seleccionado."
+                : "Registra una nueva compra de productos para el inventario."}
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="product_id">Producto *</Label>
+              <Label htmlFor="inventory-product">Producto *</Label>
               <Select
                 value={formData.product_id}
                 onValueChange={(value) => setFormData({ ...formData, product_id: value })}
                 required
+                aria-describedby="inventory-form-description"
               >
-                <SelectTrigger>
+                <SelectTrigger id="inventory-product">
                   <SelectValue placeholder="Seleccionar producto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.isArray(products) &&
+                  {Array.isArray(products) && products.length > 0 ? (
                     products.map((product) => (
                       <SelectItem key={product.id} value={product.id.toString()}>
                         {product.name} {product.brand && `- ${product.brand}`}
                       </SelectItem>
-                    ))}
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>
+                      {products.length === 0 ? "No hay productos disponibles" : "Cargando productos..."}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="purchase_price">Precio de Compra *</Label>
+                <Label htmlFor="inventory-purchase-price">Precio de Compra *</Label>
                 <Input
-                  id="purchase_price"
+                  id="inventory-purchase-price"
+                  name="purchase_price"
                   type="number"
                   step="0.01"
                   value={formData.purchase_price}
@@ -329,9 +349,10 @@ export function InventoryManagement() {
               </div>
 
               <div>
-                <Label htmlFor="purchase_quantity">Cantidad *</Label>
+                <Label htmlFor="inventory-purchase-quantity">Cantidad *</Label>
                 <Input
-                  id="purchase_quantity"
+                  id="inventory-purchase-quantity"
+                  name="purchase_quantity"
                   type="number"
                   value={formData.purchase_quantity}
                   onChange={(e) => setFormData({ ...formData, purchase_quantity: e.target.value })}
@@ -341,27 +362,43 @@ export function InventoryManagement() {
             </div>
 
             <div>
-              <Label htmlFor="supplier_name">Proveedor</Label>
+              <Label htmlFor="inventory-current-stock">Stock Actual *</Label>
               <Input
-                id="supplier_name"
+                id="inventory-current-stock"
+                name="current_stock"
+                type="number"
+                value={formData.current_stock}
+                onChange={(e) => setFormData({ ...formData, current_stock: e.target.value })}
+                placeholder="Cantidad de piezas disponibles"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="inventory-supplier-name">Proveedor</Label>
+              <Input
+                id="inventory-supplier-name"
+                name="supplier_name"
                 value={formData.supplier_name}
                 onChange={(e) => setFormData({ ...formData, supplier_name: e.target.value })}
               />
             </div>
 
             <div>
-              <Label htmlFor="supplier_contact">Contacto del Proveedor</Label>
+              <Label htmlFor="inventory-supplier-contact">Contacto del Proveedor</Label>
               <Input
-                id="supplier_contact"
+                id="inventory-supplier-contact"
+                name="supplier_contact"
                 value={formData.supplier_contact}
                 onChange={(e) => setFormData({ ...formData, supplier_contact: e.target.value })}
               />
             </div>
 
             <div>
-              <Label htmlFor="notes">Notas</Label>
+              <Label htmlFor="inventory-notes">Notas</Label>
               <Textarea
-                id="notes"
+                id="inventory-notes"
+                name="notes"
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
@@ -369,10 +406,20 @@ export function InventoryManagement() {
             </div>
 
             <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={handleCloseForm}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseForm}
+                aria-label="Cancelar registro de inventario"
+              >
                 Cancelar
               </Button>
-              <Button type="submit">{editingRecord ? "Actualizar" : "Registrar Compra"}</Button>
+              <Button
+                type="submit"
+                aria-label={editingRecord ? "Actualizar registro de inventario" : "Registrar nueva compra"}
+              >
+                {editingRecord ? "Actualizar" : "Registrar Compra"}
+              </Button>
             </div>
           </form>
         </DialogContent>

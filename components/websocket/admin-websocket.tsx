@@ -1,115 +1,154 @@
 "use client"
 
-import { useEffect } from "react"
-import { useWebSocket } from "@/hooks/use-websocket"
+import { useEffect, useRef } from "react"
+import { io, type Socket } from "socket.io-client"
+import { useToast } from "@/hooks/use-toast"
 
-export function AdminWebSocket() {
-  const socket = useWebSocket("admin")
+export function ClientWebSocket() {
+  const socketRef = useRef<Socket | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
-    if (!socket) return
+    const initializeSocket = () => {
+      const socketUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
 
-    // Listener para nuevos pedidos
-    socket.on("new-order", (data) => {
-      console.log("[v0] Nuevo pedido recibido:", data)
+      console.log("[v0] Initializing WebSocket connection to:", socketUrl)
 
-      // Mostrar notificación del navegador
-      if ("Notification" in window && Notification.permission === "granted") {
-        const notification = new Notification("🛍️ Nuevo Pedido Recibido", {
-          body: `${data.customerName} (${data.customerPhone})\nTotal: C$${data.total}`,
-          icon: "/favicon.ico",
-          badge: "/favicon.ico",
-          tag: "new-order",
-          requireInteraction: true,
-          // Note: The 'actions' property is not supported in the standard Notification API
-          // and has been removed to avoid type errors.
-        })
+      socketRef.current = io(socketUrl, {
+        transports: ["polling", "websocket"],
+        timeout: 10000,
+        forceNew: true,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+        maxReconnectionAttempts: 5,
+        upgrade: true,
+        rememberUpgrade: false,
+      })
 
-        notification.onclick = () => {
-          if (typeof window !== "undefined") {
-            window.focus()
-          }
-          // Navegar a la sección de pedidos
-          const ordersTab = document.querySelector('[value="orders"]') as HTMLElement
-          if (ordersTab) ordersTab.click()
-          notification.close()
+      const socket = socketRef.current
+
+      socket.on("connect", () => {
+        console.log("[v0] Client WebSocket connected:", socket.id)
+        socket.emit("join-client")
+      })
+
+      socket.on("disconnect", (reason) => {
+        console.log("[v0] Client WebSocket disconnected:", reason)
+        if (reason === "io server disconnect" || reason === "transport close") {
+          toast({
+            title: "Conexión perdida",
+            description: "Intentando reconectar...",
+            variant: "default",
+          })
         }
+      })
 
-        // Auto cerrar después de 10 segundos
-        setTimeout(() => notification.close(), 10000)
+      socket.on("new-product", (productData) => {
+        console.log("[v0] New product received:", productData)
+        window.dispatchEvent(new CustomEvent("productCreated", { detail: productData }))
+
+        toast({
+          title: "Nuevo producto disponible",
+          description: `${productData.name} ha sido agregado al catálogo`,
+          variant: "default",
+        })
+      })
+
+      socket.on("product-updated", (productData) => {
+        console.log("[v0] Product updated:", productData)
+        window.dispatchEvent(new CustomEvent("productUpdated", { detail: productData }))
+      })
+
+      socket.on("product-deleted", ({ productId }) => {
+        console.log("[v0] Product deleted:", productId)
+        window.dispatchEvent(new CustomEvent("productDeleted", { detail: { productId } }))
+      })
+
+      socket.on("stock-updated", ({ productId, newStock }) => {
+        console.log("[v0] Stock updated:", { productId, newStock })
+        window.dispatchEvent(
+          new CustomEvent("stockUpdated", {
+            detail: { productId, newStock },
+          }),
+        )
+      })
+
+      socket.on("inventory-changed", (inventoryData) => {
+        console.log("[v0] Inventory changed:", inventoryData)
+        window.dispatchEvent(new CustomEvent("inventoryChanged", { detail: inventoryData }))
+      })
+
+      socket.on("order-confirmed", (orderData) => {
+        console.log("[v0] Order confirmed:", orderData)
+        toast({
+          title: "Pedido confirmado",
+          description: `Tu pedido #${orderData.id} ha sido confirmado`,
+          variant: "default",
+        })
+      })
+
+      socket.on("connect_error", (error) => {
+        console.error("[v0] WebSocket connection error:", error)
+        if (error.message.includes("timeout")) {
+          console.log("[v0] Connection timeout, will retry with polling")
+        }
+      })
+
+      socket.on("error", (error) => {
+        console.error("[v0] WebSocket error:", error)
+      })
+
+      socket.on("reconnect", (attemptNumber) => {
+        console.log("[v0] WebSocket reconnected after", attemptNumber, "attempts")
+      })
+
+      socket.on("reconnect_error", (error) => {
+        console.log("[v0] WebSocket reconnection failed:", error.message)
+      })
+    }
+
+    let retryCount = 0
+    const maxRetries = 3
+
+    const connectWithRetry = () => {
+      try {
+        initializeSocket()
+      } catch (error) {
+        console.error("[v0] Socket initialization failed:", error)
+        if (retryCount < maxRetries) {
+          retryCount++
+          console.log(`[v0] Retrying connection (${retryCount}/${maxRetries})`)
+          setTimeout(connectWithRetry, 2000 * retryCount)
+        }
       }
+    }
 
-      // Mostrar notificación en la página también
-      showInPageNotification(`🛍️ Nuevo pedido de ${data.customerName} por C$${data.total}`, "order")
-
-      // Reproducir sonido de notificación
-      playNotificationSound()
-    })
+    connectWithRetry()
 
     return () => {
-      socket.off("new-order")
+      if (socketRef.current) {
+        console.log("[v0] Cleaning up client WebSocket connection")
+        socketRef.current.disconnect()
+        socketRef.current = null
+      }
     }
-  }, [socket])
+  }, [toast])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && socketRef.current?.disconnected) {
+        console.log("[v0] Page became visible, reconnecting WebSocket")
+        socketRef.current.connect()
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [])
 
   return null
-}
-
-function showInPageNotification(message: string, type: "order" | "info" = "info") {
-  // Crear elemento de notificación en la página
-  const notification = document.createElement("div")
-  notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full max-w-sm ${
-    type === "order"
-      ? "bg-gradient-to-r from-rose-500 to-pink-600 text-white border-l-4 border-yellow-400"
-      : "bg-blue-500 text-white"
-  }`
-
-  notification.innerHTML = `
-    <div class="flex items-start gap-3">
-      <div class="flex-shrink-0 text-2xl">🛍️</div>
-      <div class="flex-1">
-        <div class="font-semibold text-sm">Nuevo Pedido</div>
-        <div class="text-xs opacity-90 mt-1">${message}</div>
-      </div>
-      <button class="flex-shrink-0 text-white/80 hover:text-white text-lg leading-none" onclick="this.parentElement.parentElement.remove()">×</button>
-    </div>
-  `
-
-  document.body.appendChild(notification)
-
-  // Animar entrada
-  setTimeout(() => {
-    notification.classList.remove("translate-x-full")
-  }, 100)
-
-  // Auto remover después de 8 segundos
-  setTimeout(() => {
-    notification.classList.add("translate-x-full")
-    setTimeout(() => {
-      if (document.body.contains(notification)) {
-        document.body.removeChild(notification)
-      }
-    }, 300)
-  }, 8000)
-}
-
-function playNotificationSound() {
-  if (typeof window === "undefined") return
-
-  // Crear y reproducir sonido de notificación
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-  const oscillator = audioContext.createOscillator()
-  const gainNode = audioContext.createGain()
-
-  oscillator.connect(gainNode)
-  gainNode.connect(audioContext.destination)
-
-  oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
-  oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1)
-  oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2)
-
-  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
-
-  oscillator.start(audioContext.currentTime)
-  oscillator.stop(audioContext.currentTime + 0.3)
 }

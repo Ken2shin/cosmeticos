@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { inventoryId: string } }) {
   try {
-    const inventoryId = Number.parseInt(params.id)
+    const inventoryId = Number.parseInt(params.inventoryId)
 
     const inventory = await sql`
       SELECT 
@@ -28,9 +28,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: { inventoryId: string } }) {
   try {
-    const inventoryId = Number.parseInt(params.id)
+    const inventoryId = Number.parseInt(params.inventoryId)
     const { purchase_price, purchase_quantity, supplier_name, supplier_contact, notes } = await request.json()
 
     const inventory = await sql`
@@ -57,9 +57,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: { inventoryId: string } }) {
   try {
-    const inventoryId = Number.parseInt(params.id)
+    const inventoryId = Number.parseInt(params.inventoryId)
 
     await sql`
       DELETE FROM inventory WHERE id = ${inventoryId}

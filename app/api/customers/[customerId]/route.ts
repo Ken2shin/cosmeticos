@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { customerId: string } }) {
   try {
-    const customerId = Number.parseInt(params.id)
+    const customerId = Number.parseInt(params.customerId)
 
     const customer = await sql`
       SELECT * FROM customers WHERE id = ${customerId}
@@ -20,9 +20,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: { customerId: string } }) {
   try {
-    const customerId = Number.parseInt(params.id)
+    const customerId = Number.parseInt(params.customerId)
     const { name, email, phone, address } = await request.json()
 
     const customer = await sql`
@@ -48,9 +48,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: { customerId: string } }) {
   try {
-    const customerId = Number.parseInt(params.id)
+    const customerId = Number.parseInt(params.customerId)
 
     const result = await sql`
       DELETE FROM customers WHERE id = ${customerId}
